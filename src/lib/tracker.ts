@@ -1,12 +1,11 @@
-export type WeeklyPerformance = {
+export type DailyPerformance = {
   hoursWorked: number;
   revenue: number; // base revenue (excl. tips)
   tips: number;
   ordersDelivered: number;
-  comment?: string;
 };
 
-export type WeeklyExpenses = {
+export type DailyExpenses = {
   food: number;
   nonFood: number;
   transport: number;
@@ -15,11 +14,19 @@ export type WeeklyExpenses = {
   others: number;
 };
 
+export type WeeklyPerformance = DailyPerformance & { comment?: string };
+export type WeeklyExpenses = DailyExpenses;
+
 export type MonthlyExpenses = {
   rent: number;
   phone: number;
   svs: number;
   others: number;
+};
+
+export type DayData = {
+  performance: DailyPerformance;
+  expenses: DailyExpenses;
 };
 
 export type WeekData = {
@@ -28,7 +35,10 @@ export type WeekData = {
 };
 
 export type MonthData = {
+  // Derived "weeks" legacy field (kept for compatibility). Will not be directly edited anymore.
   weeks: Record<number, WeekData>; // 1..5
+  // Source of truth going forward
+  days?: Record<number, DayData>; // 1..31
   monthlyExpenses: MonthlyExpenses;
 };
 
@@ -50,17 +60,33 @@ export function saveStore(store: DataStore) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
 }
 
+function emptyDay(): DayData {
+  return {
+    performance: { hoursWorked: 0, revenue: 0, tips: 0, ordersDelivered: 0 },
+    expenses: { food: 0, nonFood: 0, transport: 0, diningOut: 0, entertainment: 0, others: 0 },
+  };
+}
+
+function emptyWeek(): WeekData {
+  return {
+    performance: { hoursWorked: 0, revenue: 0, tips: 0, ordersDelivered: 0, comment: "" },
+    expenses: { food: 0, nonFood: 0, transport: 0, diningOut: 0, entertainment: 0, others: 0 },
+  };
+}
+
 export function ensureMonth(store: DataStore, year: number, month: number): DataStore {
   if (!store[year]) store[year] = {} as Record<number, MonthData>;
   if (!store[year][month]) {
-    const emptyWeek = (): WeekData => ({
-      performance: { hoursWorked: 0, revenue: 0, tips: 0, ordersDelivered: 0, comment: "" },
-      expenses: { food: 0, nonFood: 0, transport: 0, diningOut: 0, entertainment: 0, others: 0 },
-    });
     store[year][month] = {
       weeks: { 1: emptyWeek(), 2: emptyWeek(), 3: emptyWeek(), 4: emptyWeek(), 5: emptyWeek() },
+      days: {},
       monthlyExpenses: { rent: 0, phone: 0, svs: 0, others: 0 },
     };
+  } else {
+    // ensure shape keys exist
+    store[year][month].weeks ||= { 1: emptyWeek(), 2: emptyWeek(), 3: emptyWeek(), 4: emptyWeek(), 5: emptyWeek() };
+    store[year][month].days ||= {};
+    store[year][month].monthlyExpenses ||= { rent: 0, phone: 0, svs: 0, others: 0 };
   }
   return store;
 }
@@ -71,6 +97,18 @@ export function getMonthData(year: number, month: number): MonthData {
   return store[year][month];
 }
 
+export function setDayData(year: number, month: number, day: number, data: Partial<DayData>) {
+  const store = ensureMonth(getStore(), year, month);
+  const monthData = store[year][month];
+  if (!monthData.days![day]) monthData.days![day] = emptyDay();
+  monthData.days![day] = {
+    performance: { ...monthData.days![day].performance, ...(data.performance || {}) },
+    expenses: { ...monthData.days![day].expenses, ...(data.expenses || {}) },
+  };
+  saveStore(store);
+}
+
+// Legacy: direct week set (kept for compatibility, but weekly UI will be read-only).
 export function setWeekData(year: number, month: number, week: number, data: Partial<WeekData>) {
   const store = ensureMonth(getStore(), year, month);
   store[year][month].weeks[week] = {
@@ -88,19 +126,55 @@ export function setMonthlyExpenses(year: number, month: number, expenses: Partia
   saveStore(store);
 }
 
+export function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+export function getWeekDayRange(year: number, month: number, week: number): { start: number; end: number } {
+  // Weeks split as 1-7, 8-14, 15-21, 22-28, 29-end
+  const daysInMonth = getDaysInMonth(year, month);
+  const start = (week - 1) * 7 + 1;
+  const end = Math.min(week * 7, daysInMonth);
+  return { start, end };
+}
+
+export function computeWeekFromDays(year: number, month: number, week: number, store?: DataStore): WeekData {
+  const s = store ? ensureMonth(structuredClone(store), year, month) : ensureMonth(getStore(), year, month);
+  const md = s[year][month];
+  const { start, end } = getWeekDayRange(year, month, week);
+  let perf: DailyPerformance = { hoursWorked: 0, revenue: 0, tips: 0, ordersDelivered: 0 };
+  let exp: DailyExpenses = { food: 0, nonFood: 0, transport: 0, diningOut: 0, entertainment: 0, others: 0 };
+  for (let d = start; d <= end; d++) {
+    const day = md.days?.[d];
+    if (!day) continue;
+    perf.hoursWorked += day.performance.hoursWorked || 0;
+    perf.revenue += day.performance.revenue || 0;
+    perf.tips += day.performance.tips || 0;
+    perf.ordersDelivered += day.performance.ordersDelivered || 0;
+    exp.food += day.expenses.food || 0;
+    exp.nonFood += day.expenses.nonFood || 0;
+    exp.transport += day.expenses.transport || 0;
+    exp.diningOut += day.expenses.diningOut || 0;
+    exp.entertainment += day.expenses.entertainment || 0;
+    exp.others += day.expenses.others || 0;
+  }
+  const comment = md.weeks[week]?.performance.comment || ""; // keep weekly comment if present
+  return { performance: { ...perf, comment }, expenses: exp };
+}
+
 export type MonthSummary = {
   totalHours: number;
   totalOrders: number;
   revenue: number;
   tips: number;
   gross: number;
-  weeklyExpensesTotal: number;
-  monthlyExpensesTotal: number;
+  weeklyExpensesTotal: number; // from sum of days
+  monthlyExpensesTotal: number; // fixed monthly
   businessExpense6: number;
   svs: number;
   netBeforeTax: number;
-  taxableAmount: number;
-  tax: number;
+  taxableAmount: number; // only excess over 1050
+  tax: number; // 20% of excess
   allExpensesExclSVS: number;
   savingsBeforeTax: number;
   savingsAfterTax: number;
@@ -109,23 +183,41 @@ export type MonthSummary = {
 export function computeMonthSummary(year: number, month: number, store?: DataStore): MonthSummary {
   const s = store ? ensureMonth(structuredClone(store), year, month) : ensureMonth(getStore(), year, month);
   const md = s[year][month];
+  const dim = getDaysInMonth(year, month);
   let totalHours = 0, totalOrders = 0, revenue = 0, tips = 0, weeklyExpensesTotal = 0;
-  for (let w = 1; w <= 5; w++) {
-    const wd = md.weeks[w];
-    if (!wd) continue;
-    totalHours += wd.performance.hoursWorked || 0;
-    totalOrders += wd.performance.ordersDelivered || 0;
-    revenue += wd.performance.revenue || 0;
-    tips += wd.performance.tips || 0;
-    const e = wd.expenses;
-    weeklyExpensesTotal += (e.food||0)+(e.nonFood||0)+(e.transport||0)+(e.diningOut||0)+(e.entertainment||0)+(e.others||0);
+
+  // Prefer days as source of truth
+  if (md.days && Object.keys(md.days).length > 0) {
+    for (let d = 1; d <= dim; d++) {
+      const day = md.days[d];
+      if (!day) continue;
+      totalHours += day.performance.hoursWorked || 0;
+      totalOrders += day.performance.ordersDelivered || 0;
+      revenue += day.performance.revenue || 0;
+      tips += day.performance.tips || 0;
+      weeklyExpensesTotal += (day.expenses.food||0)+(day.expenses.nonFood||0)+(day.expenses.transport||0)+(day.expenses.diningOut||0)+(day.expenses.entertainment||0)+(day.expenses.others||0);
+    }
+  } else {
+    // Fallback: sum legacy weeks
+    for (let w = 1; w <= 5; w++) {
+      const wd = md.weeks[w];
+      if (!wd) continue;
+      totalHours += wd.performance.hoursWorked || 0;
+      totalOrders += wd.performance.ordersDelivered || 0;
+      revenue += wd.performance.revenue || 0;
+      tips += wd.performance.tips || 0;
+      const e = wd.expenses;
+      weeklyExpensesTotal += (e.food||0)+(e.nonFood||0)+(e.transport||0)+(e.diningOut||0)+(e.entertainment||0)+(e.others||0);
+    }
   }
+
   const me = md.monthlyExpenses;
   const monthlyExpensesTotal = (me.rent||0)+(me.phone||0)+(me.svs||0)+(me.others||0);
   const gross = revenue + tips;
   const businessExpense6 = gross * 0.06;
   const svs = me.svs || 0;
   const netBeforeTax = gross - businessExpense6 - svs;
+  // Only excess over 1050 is taxable
   const taxableAmount = Math.max(0, netBeforeTax - 1050);
   const tax = taxableAmount * 0.20;
   const allExpensesExclSVS = (monthlyExpensesTotal - svs) + weeklyExpensesTotal;

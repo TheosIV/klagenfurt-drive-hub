@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { computeMonthSummary, getMonthData, MonthData, setMonthlyExpenses, setWeekData } from "@/lib/tracker";
+import DailyWeekEditor from "@/components/DailyWeekEditor";
+import { computeMonthSummary, computeWeekFromDays, getMonthData, MonthData, setMonthlyExpenses, setWeekData } from "@/lib/tracker";
 
 const formatCurrency = (n: number) => new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR", maximumFractionDigits: 2 }).format(n || 0);
 
@@ -24,11 +25,11 @@ const Index = () => {
   useEffect(() => {
     document.title = "Driver Income & Expense Tracker | Klagenfurt";
     const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute("content", "Track Lieferando driver weekly performance, expenses, and monthly savings in Klagenfurt with automatic month/week handling.");
+    if (metaDesc) metaDesc.setAttribute("content", "Track Lieferando driver daily & weekly performance, expenses, and monthly savings with auto week/month handling.");
     const ogTitle = document.querySelector('meta[property="og:title"]');
     if (ogTitle) ogTitle.setAttribute("content", "Driver Tracker Klagenfurt Dashboard");
     const ogDesc = document.querySelector('meta[property="og:description"]');
-    if (ogDesc) ogDesc.setAttribute("content", "Weekly performance, expenses, and monthly net income with tax & savings.");
+    if (ogDesc) ogDesc.setAttribute("content", "Daily logs roll up to weekly totals; monthly net income with 6% expense and 20% tax on excess over 1050.");
     const linkCanonical = document.querySelector('link[rel="canonical"]') || document.createElement('link');
     linkCanonical.setAttribute('rel','canonical');
     linkCanonical.setAttribute('href', window.location.origin + '/');
@@ -39,30 +40,24 @@ const Index = () => {
   const [year, setYear] = useState<number>(now.getFullYear());
   const [month, setMonth] = useState<number>(now.getMonth());
   const [week, setWeek] = useState<number>(getCurrentWeekIndexForMonth(now.getFullYear(), now.getMonth()));
+  const [tick, setTick] = useState(0); // force refresh when day data changes
 
   useEffect(() => {
     setWeek(getCurrentWeekIndexForMonth(year, month));
   }, [year, month]);
 
-  const monthData: MonthData = useMemo(() => getMonthData(year, month), [year, month]);
-  const currentWeek = useMemo(() => monthData.weeks[week], [monthData, week]);
-  const summary = useMemo(() => computeMonthSummary(year, month), [year, month]);
+  const monthData: MonthData = useMemo(() => getMonthData(year, month), [year, month, tick]);
+  const aggWeek = useMemo(() => computeWeekFromDays(year, month, week), [year, month, week, tick]);
+  const summary = useMemo(() => computeMonthSummary(year, month), [year, month, tick]);
 
-  const updatePerf = (field: keyof typeof currentWeek.performance, value: number | string) => {
-    const v = typeof value === 'string' ? parseFloat(value || '0') : value;
-    setWeekData(year, month, week, { performance: { ...currentWeek.performance, [field]: isNaN(v as number) ? 0 : (v as number) } });
-  };
-  const updateWeekExp = (field: keyof typeof currentWeek.expenses, value: string) => {
-    const v = parseFloat(value || '0');
-    setWeekData(year, month, week, { expenses: { ...currentWeek.expenses, [field]: isNaN(v) ? 0 : v } });
-  };
   const updateMonthExp = (field: keyof typeof monthData.monthlyExpenses, value: string) => {
     const v = parseFloat(value || '0');
     setMonthlyExpenses(year, month, { [field]: isNaN(v) ? 0 : v });
+    setTick(t => t + 1);
   };
 
-  const avgRevenuePerHour = (currentWeek.performance.revenue + currentWeek.performance.tips) / (currentWeek.performance.hoursWorked || 1);
-  const avgOrdersPerHour = (currentWeek.performance.ordersDelivered || 0) / (currentWeek.performance.hoursWorked || 1);
+  const avgRevenuePerHour = (aggWeek.performance.revenue + aggWeek.performance.tips) / (aggWeek.performance.hoursWorked || 1);
+  const avgOrdersPerHour = (aggWeek.performance.ordersDelivered || 0) / (aggWeek.performance.hoursWorked || 1);
 
   return (
     <div className="min-h-screen bg-background">
@@ -98,41 +93,32 @@ const Index = () => {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-4">
-          <StatCard title="Gross (revenue + tips)" value={formatCurrency(summary.gross)} />
-          <StatCard title="Business Expense (6%)" value={formatCurrency(summary.businessExpense6)} />
-          <StatCard title="Net Before Tax" value={formatCurrency(summary.netBeforeTax)} />
-          <StatCard title="Tax (20% over 1050)" value={formatCurrency(summary.tax)} />
-        </div>
+        <DailyWeekEditor year={year} month={month} week={week} onDataChange={() => setTick(t => t + 1)} />
 
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
-            <CardHeader><CardTitle>Weekly Performance (Week {week})</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Weekly Performance (Auto from daily)</CardTitle></CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Hours Worked</Label>
-                <Input type="number" min={0} step="0.25" value={currentWeek.performance.hoursWorked}
-                  onChange={(e) => updatePerf('hoursWorked', e.target.value)} />
+                <Input type="number" value={aggWeek.performance.hoursWorked} readOnly disabled />
               </div>
               <div className="space-y-2">
                 <Label>Revenue (€)</Label>
-                <Input type="number" min={0} step="0.01" value={currentWeek.performance.revenue}
-                  onChange={(e) => updatePerf('revenue', e.target.value)} />
+                <Input type="number" value={aggWeek.performance.revenue} readOnly disabled />
               </div>
               <div className="space-y-2">
                 <Label>Tips (€)</Label>
-                <Input type="number" min={0} step="0.01" value={currentWeek.performance.tips}
-                  onChange={(e) => updatePerf('tips', e.target.value)} />
+                <Input type="number" value={aggWeek.performance.tips} readOnly disabled />
               </div>
               <div className="space-y-2">
                 <Label>Orders Delivered</Label>
-                <Input type="number" min={0} step="1" value={currentWeek.performance.ordersDelivered}
-                  onChange={(e) => updatePerf('ordersDelivered', e.target.value)} />
+                <Input type="number" value={aggWeek.performance.ordersDelivered} readOnly disabled />
               </div>
               <div className="space-y-1 md:col-span-2">
-                <Label>Comment</Label>
-                <Input type="text" value={currentWeek.performance.comment || ''}
-                  onChange={(e) => setWeekData(year, month, week, { performance: { ...currentWeek.performance, comment: e.target.value } })} />
+                <Label>Weekly Comment</Label>
+                <Input type="text" value={monthData.weeks[week]?.performance.comment || ''}
+                  onChange={(e) => { setWeekData(year, month, week, { performance: { ...monthData.weeks[week].performance, comment: e.target.value } }); setTick(t => t + 1);} } />
               </div>
               <Separator className="md:col-span-2" />
               <div className="grid gap-4 md:grid-cols-2 md:col-span-2">
@@ -143,20 +129,19 @@ const Index = () => {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Weekly Expenses (Week {week})</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Weekly Expenses (Auto from daily)</CardTitle></CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               {([
                 ['food','Food'], ['nonFood','Non-food'], ['transport','Transport'], ['diningOut','Dining Out'], ['entertainment','Entertainment'], ['others','Others']
               ] as const).map(([key,label]) => (
                 <div key={key} className="space-y-2">
                   <Label>{label} (€)</Label>
-                  <Input type="number" min={0} step="0.01" value={currentWeek.expenses[key] as number}
-                    onChange={(e) => updateWeekExp(key, e.target.value)} />
+                  <Input type="number" value={aggWeek.expenses[key] as number} readOnly disabled />
                 </div>
               ))}
               <Separator className="md:col-span-2" />
               <div className="grid gap-4 md:grid-cols-2 md:col-span-2">
-                <StatCard title="This Week Total" value={formatCurrency(Object.values(currentWeek.expenses).reduce((a,b)=>a+(b||0),0))} />
+                <StatCard title="This Week Total" value={formatCurrency(Object.values(aggWeek.expenses).reduce((a,b)=>a+(b||0),0))} />
                 <StatCard title="Month Weekly Sum" value={formatCurrency(summary.weeklyExpensesTotal)} />
               </div>
             </CardContent>
@@ -179,8 +164,11 @@ const Index = () => {
         </Card>
 
         <div className="grid gap-4 md:grid-cols-3">
+          <StatCard title="Gross (revenue + tips)" value={formatCurrency(summary.gross)} />
+          <StatCard title="Business Expense (6%)" value={formatCurrency(summary.businessExpense6)} />
+          <StatCard title="Net Before Tax" value={formatCurrency(summary.netBeforeTax)} />
+          <StatCard title="Tax (20% over 1050)" value={formatCurrency(summary.tax)} />
           <StatCard title="All Monthly Expenses (incl. SVS)" value={formatCurrency(summary.monthlyExpensesTotal + summary.weeklyExpensesTotal)} />
-          <StatCard title="Savings Before Tax" value={formatCurrency(summary.savingsBeforeTax)} help="Net before tax minus all expenses (excluding SVS twice)" />
           <StatCard title="Savings After Tax" value={formatCurrency(summary.savingsAfterTax)} />
         </div>
       </main>
@@ -189,4 +177,3 @@ const Index = () => {
 };
 
 export default Index;
-
