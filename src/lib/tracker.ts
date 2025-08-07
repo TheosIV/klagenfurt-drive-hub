@@ -78,13 +78,13 @@ export function ensureMonth(store: DataStore, year: number, month: number): Data
   if (!store[year]) store[year] = {} as Record<number, MonthData>;
   if (!store[year][month]) {
     store[year][month] = {
-      weeks: { 1: emptyWeek(), 2: emptyWeek(), 3: emptyWeek(), 4: emptyWeek(), 5: emptyWeek() },
+      weeks: { 1: emptyWeek(), 2: emptyWeek(), 3: emptyWeek(), 4: emptyWeek(), 5: emptyWeek(), 6: emptyWeek() },
       days: {},
       monthlyExpenses: { rent: 0, phone: 0, svs: 0, others: 0 },
     };
   } else {
     // ensure shape keys exist
-    store[year][month].weeks ||= { 1: emptyWeek(), 2: emptyWeek(), 3: emptyWeek(), 4: emptyWeek(), 5: emptyWeek() };
+    store[year][month].weeks ||= { 1: emptyWeek(), 2: emptyWeek(), 3: emptyWeek(), 4: emptyWeek(), 5: emptyWeek(), 6: emptyWeek() };
     store[year][month].days ||= {};
     store[year][month].monthlyExpenses ||= { rent: 0, phone: 0, svs: 0, others: 0 };
   }
@@ -130,12 +130,45 @@ export function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
 }
 
+export type WeekRange = { index: number; start: number; end: number; label: string };
+
+function monthShortLower(year: number, month: number) {
+  return new Date(year, month, 1).toLocaleString(undefined, { month: 'short' }).toLowerCase();
+}
+
+export function getWeeksForMonth(year: number, month: number): WeekRange[] {
+  const dim = getDaysInMonth(year, month);
+  const dowFirst = new Date(year, month, 1).getDay(); // 0=Sun..6=Sat
+  const firstMonday = 1 + ((8 - dowFirst) % 7); // day number of first Monday in this month
+  const weeks: WeekRange[] = [];
+  let idx = 1;
+  if (firstMonday > 1) {
+    weeks.push({ index: idx++, start: 1, end: firstMonday - 1, label: `1-${firstMonday - 1} ${monthShortLower(year, month)}` });
+  }
+  for (let start = firstMonday; start <= dim; start += 7) {
+    const end = Math.min(start + 6, dim);
+    weeks.push({ index: idx++, start, end, label: `${start}-${end} ${monthShortLower(year, month)}` });
+  }
+  return weeks;
+}
+
 export function getWeekDayRange(year: number, month: number, week: number): { start: number; end: number } {
-  // Weeks split as 1-7, 8-14, 15-21, 22-28, 29-end
-  const daysInMonth = getDaysInMonth(year, month);
-  const start = (week - 1) * 7 + 1;
-  const end = Math.min(week * 7, daysInMonth);
-  return { start, end };
+  const weeks = getWeeksForMonth(year, month);
+  const w = weeks.find(w => w.index === week) || weeks[0];
+  return { start: w.start, end: w.end };
+}
+
+export function getCurrentWeekIndex(year: number, month: number, today: Date = new Date()): number {
+  const day = (today.getFullYear() === year && today.getMonth() === month) ? today.getDate() : 1;
+  const weeks = getWeeksForMonth(year, month);
+  const found = weeks.find(w => day >= w.start && day <= w.end);
+  return found?.index || 1;
+}
+
+export function getDayName(year: number, month: number, day: number): string {
+  const names = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const d = new Date(year, month, day).getDay();
+  return names[d];
 }
 
 export function computeWeekFromDays(year: number, month: number, week: number, store?: DataStore): WeekData {

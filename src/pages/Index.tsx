@@ -8,17 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DailyWeekEditor from "@/components/DailyWeekEditor";
-import { computeMonthSummary, computeWeekFromDays, getMonthData, MonthData, setMonthlyExpenses, setWeekData } from "@/lib/tracker";
+import { computeMonthSummary, computeWeekFromDays, getMonthData, MonthData, setMonthlyExpenses, setWeekData, getWeeksForMonth, getCurrentWeekIndex } from "@/lib/tracker";
+import { TrendingUp, Receipt, PiggyBank } from "lucide-react";
 
 const formatCurrency = (n: number) => new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR", maximumFractionDigits: 2 }).format(n || 0);
 
-const getCurrentWeekIndexForMonth = (year: number, month: number) => {
-  const now = new Date();
-  if (now.getFullYear() === year && now.getMonth() === month) {
-    return Math.min(5, Math.max(1, Math.ceil(now.getDate() / 7)));
-  }
-  return 1;
-};
 
 const Index = () => {
   // SEO
@@ -39,11 +33,11 @@ const Index = () => {
   const now = new Date();
   const [year, setYear] = useState<number>(now.getFullYear());
   const [month, setMonth] = useState<number>(now.getMonth());
-  const [week, setWeek] = useState<number>(getCurrentWeekIndexForMonth(now.getFullYear(), now.getMonth()));
+  const [week, setWeek] = useState<number>(getCurrentWeekIndex(now.getFullYear(), now.getMonth()));
   const [tick, setTick] = useState(0); // force refresh when day data changes
 
   useEffect(() => {
-    setWeek(getCurrentWeekIndexForMonth(year, month));
+    setWeek(getCurrentWeekIndex(year, month));
   }, [year, month]);
 
   const monthData: MonthData = useMemo(() => getMonthData(year, month), [year, month, tick]);
