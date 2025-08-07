@@ -53,6 +53,21 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Brand additions */
+    --brand: 210 90% 50%;
+    --brand-foreground: 210 40% 98%;
+
+    /* Gradients (use with helper classes) */
+    --gradient-1: 210 90% 50%;
+    --gradient-2: 278 86% 60%;
+    --gradient-surface-start: 0 0% 100%;
+    --gradient-surface-end: 210 40% 98%;
+
+    /* Shadows & motion */
+    --shadow-soft: 0 20px 40px -20px hsl(var(--gradient-1) / 0.35);
+    --shadow-elevated: 0 30px 80px -30px hsl(var(--gradient-2) / 0.35);
+    --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
@@ -101,5 +116,30 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .bg-gradient-hero {
+    background-image: linear-gradient(135deg, hsl(var(--gradient-1)), hsl(var(--gradient-2)));
+  }
+  .surface-gradient {
+    background-image: linear-gradient(180deg, hsl(var(--gradient-surface-start)), hsl(var(--gradient-surface-end)));
+  }
+  .glass-card {
+    backdrop-filter: blur(12px);
+    background-color: hsl(var(--card) / 0.65);
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-soft);
+  }
+  .ambient-glow {
+    position: absolute;
+    width: 60vw;
+    height: 60vw;
+    filter: blur(60px);
+    pointer-events: none;
+    background: radial-gradient(closest-side, hsl(var(--gradient-1) / 0.22), transparent 70%);
+    transform: translate3d(var(--glow-x, 0), var(--glow-y, 0), 0);
+    transition: var(--transition-smooth);
   }
 }
