@@ -17,13 +17,13 @@ const formatCurrency = (n: number) => new Intl.NumberFormat(undefined, { style: 
 const Index = () => {
   // SEO
   useEffect(() => {
-    document.title = "Driver Income & Expense Tracker | Klagenfurt";
+    document.title = "MoneyTrail — Driver Finance Dashboard";
     const metaDesc = document.querySelector('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute("content", "Track Lieferando driver daily & weekly performance, expenses, and monthly savings with auto week/month handling.");
+    if (metaDesc) metaDesc.setAttribute("content", "Track revenue, expenses, taxes and savings with weekly and monthly insights in MoneyTrail.");
     const ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle) ogTitle.setAttribute("content", "Driver Tracker Klagenfurt Dashboard");
+    if (ogTitle) ogTitle.setAttribute("content", "MoneyTrail Dashboard");
     const ogDesc = document.querySelector('meta[property="og:description"]');
-    if (ogDesc) ogDesc.setAttribute("content", "Daily logs roll up to weekly totals; monthly net income with 6% expense and 20% tax on excess over 1050.");
+    if (ogDesc) ogDesc.setAttribute("content", "Daily logs roll up to weekly and monthly insights. Dark and Night themes supported.");
     const linkCanonical = document.querySelector('link[rel="canonical"]') || document.createElement('link');
     linkCanonical.setAttribute('rel','canonical');
     linkCanonical.setAttribute('href', window.location.origin + '/');
