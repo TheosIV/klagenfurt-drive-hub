@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import DailyWeekEditor from "@/components/DailyWeekEditor";
 import { computeMonthSummary, computeWeekFromDays, getMonthData, MonthData, setMonthlyExpenses, setWeekData, getWeeksForMonth, getCurrentWeekIndex } from "@/lib/tracker";
-import { TrendingUp, Receipt, PiggyBank } from "lucide-react";
+import { TrendingUp, Receipt } from "lucide-react";
 
 const formatCurrency = (n: number) => new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR", maximumFractionDigits: 2 }).format(n || 0);
 
@@ -59,7 +59,7 @@ const Index = () => {
       <main className="container mx-auto space-y-6">
         <h1 className="sr-only">Driver Income & Expense Tracker Dashboard</h1>
 
-        <Card className="glass-card">
+        <Card className="glass-card animate-fade-in">
           <CardHeader>
             <CardTitle className="flex items-center justify-between gap-4">
               <span>Timeframe</span>
@@ -72,7 +72,9 @@ const Index = () => {
               <Select value={String(week)} onValueChange={(v) => setWeek(parseInt(v))}>
                 <SelectTrigger><SelectValue placeholder="Select week" /></SelectTrigger>
                 <SelectContent>
-                  {[1,2,3,4,5].map(w => <SelectItem key={w} value={String(w)}>Week {w}</SelectItem>)}
+                  {getWeeksForMonth(year, month).map((wr) => (
+                    <SelectItem key={wr.index} value={String(wr.index)}>{wr.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -90,8 +92,8 @@ const Index = () => {
         <DailyWeekEditor year={year} month={month} week={week} onDataChange={() => setTick(t => t + 1)} />
 
         <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader><CardTitle>Weekly Performance (Auto from daily)</CardTitle></CardHeader>
+          <Card className="animate-fade-in">
+            <CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp className="h-4 w-4 text-muted-foreground" /> Weekly Performance (Auto from daily)</CardTitle></CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Hours Worked</Label>
@@ -122,8 +124,8 @@ const Index = () => {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle>Weekly Expenses (Auto from daily)</CardTitle></CardHeader>
+          <Card className="animate-fade-in">
+            <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-4 w-4 text-muted-foreground" /> Weekly Expenses (Auto from daily)</CardTitle></CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               {([
                 ['food','Food'], ['nonFood','Non-food'], ['transport','Transport'], ['diningOut','Dining Out'], ['entertainment','Entertainment'], ['others','Others']
@@ -142,8 +144,8 @@ const Index = () => {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader><CardTitle>Monthly Fixed Expenses</CardTitle></CardHeader>
+        <Card className="animate-fade-in">
+          <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-4 w-4 text-muted-foreground" /> Monthly Fixed Expenses</CardTitle></CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-4">
             {([
               ['rent','Rent'], ['phone','Phone'], ['svs','SVS'], ['others','Others']
