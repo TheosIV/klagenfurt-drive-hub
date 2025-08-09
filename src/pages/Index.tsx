@@ -3,6 +3,7 @@ import AppHeader from "@/components/AppHeader";
 import MonthNavigator from "@/components/MonthNavigator";
 import StatCard from "@/components/StatCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -50,6 +51,13 @@ const Index = () => {
     setTick(t => t + 1);
   };
 
+  const goToToday = () => {
+    const d = new Date();
+    setYear(d.getFullYear());
+    setMonth(d.getMonth());
+    setWeek(getCurrentWeekIndex(d.getFullYear(), d.getMonth()));
+  };
+
   const avgRevenuePerHour = (aggWeek.performance.revenue + aggWeek.performance.tips) / (aggWeek.performance.hoursWorked || 1);
   const avgOrdersPerHour = (aggWeek.performance.ordersDelivered || 0) / (aggWeek.performance.hoursWorked || 1);
 
@@ -66,7 +74,7 @@ const Index = () => {
               <MonthNavigator year={year} month={month} onChange={(y, m) => { setYear(y); setMonth(m); }} />
             </CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-3">
+          <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Week</Label>
               <Select value={String(week)} onValueChange={(v) => setWeek(parseInt(v))}>
@@ -78,13 +86,8 @@ const Index = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Year</Label>
-              <Input type="number" value={year} onChange={(e) => setYear(parseInt(e.target.value || '0') || now.getFullYear())} />
-            </div>
-            <div className="space-y-2">
-              <Label>Month (0-11)</Label>
-              <Input type="number" min={0} max={11} value={month} onChange={(e) => setMonth(Math.min(11, Math.max(0, parseInt(e.target.value||'0'))))} />
+            <div className="flex items-end">
+              <Button variant="secondary" onClick={goToToday} aria-label="Jump to today">Today</Button>
             </div>
           </CardContent>
         </Card>
